@@ -10,6 +10,7 @@ dump_schema = nil
 env = nil
 migrate_dir = nil
 migrate_ver = nil
+migrate_ext = nil
 backtrace = nil
 show_version = false
 test = true
@@ -39,17 +40,17 @@ options = OptionParser.new do |opts|
     code = v
     exclusive_options << :c
   end
-  
-  opts.on("-C", "--copy-databases", "copy one database to another") do 
+
+  opts.on("-C", "--copy-databases", "copy one database to another") do
     copy_databases = true
     exclusive_options << :C
   end
-  
-  opts.on("-d", "--dump-migration", "print database migration to STDOUT") do 
+
+  opts.on("-d", "--dump-migration", "print database migration to STDOUT") do
     dump_migration = true
     exclusive_options << :d
   end
-  
+
   opts.on("-D", "--dump-migration-same-db", "print database migration to STDOUT without type translation") do
     dump_migration = :same_db
     exclusive_options << :D
@@ -58,12 +59,12 @@ options = OptionParser.new do |opts|
   opts.on("-e", "--env ENV", "use environment config for database") do |v|
     env = v
   end
-  
+
   opts.on("-E", "--echo", "echo SQL statements") do
     require 'logger'
     loggers << Logger.new($stdout)
   end
-  
+
   opts.on("-I", "--include dir", "specify $LOAD_PATH directory") do |v|
     $: << v
   end
@@ -72,18 +73,22 @@ options = OptionParser.new do |opts|
     require 'logger'
     loggers << Logger.new(v)
   end
-  
+
   opts.on("-L", "--load-dir DIR", "loads all *.rb under specifed directory") do |v|
     load_dirs << v
   end
-  
+
   opts.on("-m", "--migrate-directory DIR", "run the migrations in directory") do |v|
     migrate_dir = v
     exclusive_options << :m
   end
-  
+
   opts.on("-M", "--migrate-version VER", "migrate the database to version given") do |v|
     migrate_ver = Integer(v)
+  end
+
+  opts.on("-X", "--migrate-extension EXT", "load an extension before migrating") do |v|
+    migrate_ext = v.to_sym
   end
 
   opts.on("-N", "--no-test-connection", "do not test the connection") do
@@ -102,7 +107,7 @@ options = OptionParser.new do |opts|
   opts.on("-t", "--trace", "Output the full backtrace if an exception is raised") do
     backtrace = true
   end
-  
+
   opts.on_tail("-v", "--version", "Show version") do
     show_version = true
   end
@@ -118,6 +123,7 @@ error_proc = lambda do |msg|
 end
 
 error_proc["Error: Must specify -m if using -M"] if migrate_ver && !migrate_dir
+error_proc["Error: Must specify -m if using -X"] if migrate_ext && !migrate_dir
 error_proc["Error: Cannot specify #{exclusive_options.map{|v| "-#{v}"}.join(' and ')} together"] if exclusive_options.length > 1
 
 connect_proc = lambda do |database|
@@ -152,6 +158,7 @@ begin
   load_dirs.each{|d| d.is_a?(Array) ? require(d.first) : Dir["#{d}/**/*.rb"].each{|f| load(f)}}
   if migrate_dir
     Sequel.extension :migration, :core_extensions
+    DB.extension migrate_ext if migrate_ext
     Sequel::Migrator.apply(DB, migrate_dir, migrate_ver)
     exit
   end
@@ -197,7 +204,7 @@ begin
           j = 0
           DB.from(table).each do |record|
             if Time.now - time > 5
-              puts "Status: #{j} records copied" 
+              puts "Status: #{j} records copied"
               time = Time.now
             end
             to_ds.insert(record)
@@ -233,7 +240,7 @@ rescue => e
   error_proc["Error: #{e.class}: #{e.message}\n#{e.backtrace.first}"]
 end
 
-if !ARGV.empty? 
+if !ARGV.empty?
   ARGV.each{|v| load(v)}
 elsif !$stdin.isatty
   eval($stdin.read)

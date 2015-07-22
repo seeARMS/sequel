@@ -43,7 +43,7 @@ describe "bin/sequel" do
     File.delete(TMP_FILE) if File.file?(TMP_FILE)
     File.delete(OUTPUT) if File.file?(OUTPUT)
   end
-  
+
   it "-h should print the help" do
     help = bin(:args=>"-h", :no_conn=>true)
     help.must_match(/\ASequel: The Database Toolkit for Ruby/)
@@ -111,10 +111,10 @@ Sequel.migration do
       primary_key :a
       String :name, :size=>255
     end
-    
+
     create_table(:b, :ignore_index_errors=>true) do
       foreign_key :a, :a
-      
+
       index [:a]
     end
   end
@@ -127,10 +127,10 @@ Sequel.migration do
       primary_key :a
       column :name, "varchar(255)"
     end
-    
+
     create_table(:b) do
       foreign_key :a, :a
-      
+
       index [:a]
     end
   end
@@ -162,6 +162,11 @@ END
 
   it "-M should specify version to migrate to" do
     bin(:args=>"-m spec/files/integer_migrations -M 2").must_equal ''
+    DB.tables.sort_by{|t| t.to_s}.must_equal [:schema_info, :sm1111, :sm2222]
+  end
+
+  it "-X should load an extension before migrating" do
+    bin(:args=>"-X pg_enum -m spec/files/integer_migrations").must_equal ''
     DB.tables.sort_by{|t| t.to_s}.must_equal [:schema_info, :sm1111, :sm2222]
   end
 
